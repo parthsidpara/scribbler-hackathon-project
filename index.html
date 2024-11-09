@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Snake Mania</title>
+  <title>Snake Game with Voice Controls</title>
   <style>
     body {
       height: 100%;
@@ -22,9 +22,8 @@
 
     .game-container {
       display: flex;
-      height: 100vh;
+      margin-top:25px;
       flex-direction: column;
-      justify-content: center;
       align-items: center;
       gap: 15px;
       position: relative;
@@ -153,12 +152,13 @@
         width: 100%;
       }
     }
+
   </style>
 </head>
 
 <body>
+  <!-- Game Area -->
   <div class="game-container">
-    <h1>Welcome to Snake Mania!</h1>
     <div class="score-board" id="score">Score: 0</div>
     <canvas width="400" height="400" id="game"></canvas>
     <div class="controls">
@@ -170,6 +170,7 @@
     <div id="lastCommand"></div>
   </div>
 
+  <!-- Voice Command Box -->
   <div class="container-right">
     <div class="texts">
       <p>Voice commands will appear here once enabled...</p>
@@ -177,30 +178,80 @@
   </div>
 
   <script>
-    const canvas = document.getElementById('game');
-    const context = canvas.getContext('2d');
-    const grid = 16;
-    let count = 0;
-    let score = 0;
-    let gameRunning = true;
-    let voiceControlsActive = false;
-    let commandCooldown = false;
+    var canvas = document.getElementById('game');
+    var context = canvas.getContext('2d');
+    var grid = 16;
+    var count = 0;
+    var score = 0;
+    var gameRunning = true;
+    var voiceControlsActive = false;
+    var commandCooldown = false; // New variable for debouncing voice commands
 
-    const snake = {
+    var snake = {
       x: 160,
       y: 160,
       dx: grid,
       dy: 0,
       cells: [],
       maxCells: 4,
-      color: getRandomColor(),
+      color: getRandomColor()
     };
 
-    const apple = {
+    var apple = {
       x: 320,
       y: 320,
-      color: getRandomColor(),
+      color: getRandomColor()
     };
+
+    // Function to get a random integer between two numbers
+    function getRandomInt(min, max) {
+      return Math.floor(Math.random() * (max - min)) + min;
+    }
+
+    // Function to generate a random color
+    function getRandomColor() {
+      const letters = '0123456789ABCDEF';
+      let color = '#';
+      for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+      }
+      return color;
+    }
+
+    // Update the score display
+    function updateScore() {
+      document.getElementById('score').textContent = 'Score: ' + score;
+    }
+
+    // Reset the game
+    function resetGame() {
+      // Reset snake position and properties
+      snake.x = 160;
+      snake.y = 160;
+      snake.cells = [];
+      snake.maxCells = 4;
+      snake.dx = grid;
+      snake.dy = 0;
+      snake.color = getRandomColor();  // Random snake color on reset
+      score = 0;
+
+      // Reset the game loop count
+      count = 0;
+
+      updateScore();
+
+      // Randomize apple position
+      do {
+        apple.x = getRandomInt(0, 25) * grid;
+        apple.y = getRandomInt(0, 25) * grid;
+      } while (apple.x === snake.x && apple.y === snake.y);
+
+      apple.color = getRandomColor();  // Random apple color on reset
+
+      // Stop any existing game loop from running
+      gameRunning = true;
+      loop();
+    }
 
     const texts = document.querySelector('.texts');
     const voiceStatus = document.getElementById('voiceStatus');
@@ -208,42 +259,7 @@
     const lastCommand = document.getElementById('lastCommand');
     let recognition = null;
 
-    // Utility functions
-    function getRandomInt(min, max) {
-      return Math.floor(Math.random() * (max - min)) + min;
-    }
-
-    function getRandomColor() {
-      const letters = '0123456789ABCDEF';
-      return '#' + Array.from({ length: 6 }, () => letters[Math.floor(Math.random() * 16)]).join('');
-    }
-
-    function updateScore() {
-      document.getElementById('score').textContent = 'Score: ' + score;
-    }
-
-    // Initialize the game
-    function resetGame() {
-      snake.x = 160;
-      snake.y = 160;
-      snake.cells = [];
-      snake.maxCells = 4;
-      snake.dx = grid;
-      snake.dy = 0;
-      snake.color = getRandomColor();
-      score = 0;
-      count = 0;
-      updateScore();
-      do {
-        apple.x = getRandomInt(0, 25) * grid;
-        apple.y = getRandomInt(0, 25) * grid;
-      } while (apple.x === snake.x && apple.y === snake.y);
-      apple.color = getRandomColor();
-      gameRunning = true;
-      loop();
-    }
-
-    // Voice command handler
+    // Process voice commands
     function processVoiceCommand(text) {
       if (!gameRunning || commandCooldown) return;
 
@@ -251,23 +267,47 @@
       lastCommand.textContent = 'Last command: ' + text;
 
       const directions = {
-        up: () => { if (snake.dy === 0) snake.dy = -grid, snake.dx = 0; },
-        down: () => { if (snake.dy === 0) snake.dy = grid, snake.dx = 0; },
-        left: () => { if (snake.dx === 0) snake.dx = -grid, snake.dy = 0; },
-        right: () => { if (snake.dx === 0) snake.dx = grid, snake.dy = 0; },
+        'up': () => {
+          if (snake.dy === 0) {
+            snake.dy = -grid;
+            snake.dx = 0;
+          }
+        },
+        'down': () => {
+          if (snake.dy === 0) {
+            snake.dy = grid;
+            snake.dx = 0;
+          }
+        },
+        'left': () => {
+          if (snake.dx === 0) {
+            snake.dx = -grid;
+            snake.dy = 0;
+          }
+        },
+        'right': () => {
+          if (snake.dx === 0) {
+            snake.dx = grid;
+            snake.dy = 0;
+          }
+        }
       };
 
       Object.keys(directions).forEach(dir => {
-        if (text.includes(dir)) directions[dir]();
+        if (text.includes(dir)) {
+          directions[dir]();
+        }
       });
 
       commandCooldown = true;
-      setTimeout(() => { commandCooldown = false; }, 500);
+      setTimeout(() => {
+        commandCooldown = false;
+      }, 500);  // Cooldown to prevent rapid consecutive commands
     }
 
     // Initialize voice controls
     function initializeVoiceControls() {
-      if (!('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+      if (!window.SpeechRecognition && !window.webkitSpeechRecognition) {
         voiceStatus.textContent = 'Speech recognition is not supported in this browser.';
         voiceStatus.style.backgroundColor = '#ff4444';
         startVoiceButton.style.display = 'none';
@@ -280,24 +320,30 @@
         recognition.interimResults = true;
         recognition.lang = 'en-US';
 
-        recognition.onstart = () => {
+        recognition.onstart = function () {
           voiceControlsActive = true;
           voiceStatus.textContent = 'Voice controls are active!';
           voiceStatus.style.backgroundColor = '#4CAF50';
           startVoiceButton.style.display = 'none';
         };
 
-        recognition.onresult = event => {
-          const transcript = event.results[event.resultIndex][0].transcript;
-          const p = document.createElement('p');
+        recognition.onresult = function (event) {
+          const current = event.resultIndex;
+          const transcript = event.results[current][0].transcript;
+
+          const p = document.createElement("p");
           p.innerText = transcript;
           texts.appendChild(p);
           texts.scrollTop = texts.scrollHeight;
+
           processVoiceCommand(transcript);
-          while (texts.children.length > 5) texts.removeChild(texts.firstChild);
+
+          while (texts.children.length > 5) {
+            texts.removeChild(texts.firstChild);
+          }
         };
 
-        recognition.onerror = event => {
+        recognition.onerror = function (event) {
           console.error('Speech recognition error:', event.error);
           voiceStatus.textContent = 'Error: ' + event.error;
           voiceStatus.style.backgroundColor = '#ff4444';
@@ -306,13 +352,17 @@
 
           if (['no-speech', 'audio-capture', 'network'].includes(event.error)) {
             setTimeout(() => {
-              if (voiceControlsActive) recognition.start();
+              if (voiceControlsActive) {
+                recognition.start();
+              }
             }, 1000);
           }
         };
 
-        recognition.onend = () => {
-          if (voiceControlsActive) setTimeout(() => recognition.start(), 500);
+        recognition.onend = function () {
+          if (voiceControlsActive) {
+            setTimeout(() => recognition.start(), 500);
+          }
         };
 
         recognition.start();
@@ -324,40 +374,52 @@
       }
     }
 
-    // Game loop
+    startVoiceButton.addEventListener('click', initializeVoiceControls);
+
+    // Main game loop
     function loop() {
       requestAnimationFrame(loop);
       if (!gameRunning) return;
 
-      if (++count < 10) return;
-      count = 0;
+      if (++count < 10) {
+        return;
+      }
 
+      count = 0; // Ensure the snake speed stays constant across games
       context.clearRect(0, 0, canvas.width, canvas.height);
 
       snake.x += snake.dx;
       snake.y += snake.dy;
 
-      // Wrap the snake around the canvas
-      if (snake.x < 0) snake.x = canvas.width - grid;
-      if (snake.x >= canvas.width) snake.x = 0;
-      if (snake.y < 0) snake.y = canvas.height - grid;
-      if (snake.y >= canvas.height) snake.y = 0;
+      if (snake.x < 0) {
+        snake.x = canvas.width - grid;
+      } else if (snake.x >= canvas.width) {
+        snake.x = 0;
+      }
+      if (snake.y < 0) {
+        snake.y = canvas.height - grid;
+      } else if (snake.y >= canvas.height) {
+        snake.y = 0;
+      }
 
       snake.cells.unshift({ x: snake.x, y: snake.y });
 
-      if (snake.cells.length > snake.maxCells) snake.cells.pop();
+      if (snake.cells.length > snake.maxCells) {
+        snake.cells.pop();
+      }
 
-      // Check for apple collision
+      // Draw the apple
       context.fillStyle = apple.color;
       context.beginPath();
       context.arc(apple.x + grid / 2, apple.y + grid / 2, grid / 2 - 1, 0, Math.PI * 2);
       context.fill();
 
-      // Draw snake
+      // Draw the snake
       context.fillStyle = snake.color;
-      snake.cells.forEach((cell, index) => {
+      snake.cells.forEach(function (cell, index) {
         context.fillRect(cell.x, cell.y, grid - 1, grid - 1);
 
+        // Check for collision with the apple
         if (cell.x === apple.x && cell.y === apple.y) {
           snake.maxCells++;
           score += 10;
@@ -367,24 +429,31 @@
           do {
             newApplePosition = {
               x: getRandomInt(0, 25) * grid,
-              y: getRandomInt(0, 25) * grid,
+              y: getRandomInt(0, 25) * grid
             };
-          } while (snake.cells.some(segment => segment.x === newApplePosition.x && segment.y === newApplePosition.y));
+          } while (snake.cells.some(segment =>
+            segment.x === newApplePosition.x && segment.y === newApplePosition.y
+          ));
 
           apple.x = newApplePosition.x;
           apple.y = newApplePosition.y;
+
+          // Randomize apple color after eating
           apple.color = getRandomColor();
+
+          // Randomize snake color after eating
           snake.color = getRandomColor();
         }
 
         // Check for self-collision
-        for (let i = index + 1; i < snake.cells.length; i++) {
+        for (var i = index + 1; i < snake.cells.length; i++) {
           if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
             gameRunning = false;
 
             const gameOverDiv = document.createElement('div');
             gameOverDiv.className = 'game-over';
-            gameOverDiv.innerHTML = `Game Over! <br> Score: ${score} <br><button onclick="restartGame()">Restart</button>`;
+            gameOverDiv.innerHTML = `Game Over! <br> Score: ${score} <br>
+              <button onclick="restartGame()">Restart</button>`;
             document.body.appendChild(gameOverDiv);
           }
         }
@@ -394,21 +463,31 @@
     // Restart the game
     function restartGame() {
       const gameOverDiv = document.querySelector('.game-over');
-      if (gameOverDiv) gameOverDiv.remove();
+      if (gameOverDiv) {
+        gameOverDiv.remove(); // Remove the game over screen
+      }
+
       resetGame();
     }
 
-    // Keyboard control
-    document.addEventListener('keydown', (e) => {
+    // Control snake using keyboard
+    document.addEventListener('keydown', function (e) {
       if (!gameRunning) return;
 
-      if (e.key === 'ArrowLeft' && snake.dx === 0) snake.dx = -grid, snake.dy = 0;
-      if (e.key === 'ArrowUp' && snake.dy === 0) snake.dy = -grid, snake.dx = 0;
-      if (e.key === 'ArrowRight' && snake.dx === 0) snake.dx = grid, snake.dy = 0;
-      if (e.key === 'ArrowDown' && snake.dy === 0) snake.dy = grid, snake.dx = 0;
+      if (e.key === 'ArrowLeft' && snake.dx === 0) {
+        snake.dx = -grid;
+        snake.dy = 0;
+      } else if (e.key === 'ArrowUp' && snake.dy === 0) {
+        snake.dy = -grid;
+        snake.dx = 0;
+      } else if (e.key === 'ArrowRight' && snake.dx === 0) {
+        snake.dx = grid;
+        snake.dy = 0;
+      } else if (e.key === 'ArrowDown' && snake.dy === 0) {
+        snake.dy = grid;
+        snake.dx = 0;
+      }
     });
-
-    startVoiceButton.addEventListener('click', initializeVoiceControls);
 
     resetGame();
     loop();
