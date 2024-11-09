@@ -384,7 +384,7 @@
 
             const gameOverDiv = document.createElement('div');
             gameOverDiv.className = 'game-over';
-            gameOverDiv.innerHTML = Game Over! <br> Score: ${score} <br><button onclick="restartGame()">Restart</button>;
+            gameOverDiv.innerHTML = `Game Over! <br> Score: ${score} <br><button onclick="restartGame()">Restart</button>`;
             document.body.appendChild(gameOverDiv);
           }
         }
