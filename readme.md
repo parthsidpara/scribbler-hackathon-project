@@ -8,6 +8,8 @@ Rishabh - 23BCE1258
 Varun - 23BCE1307
 
 ### Project: Voice Controlled Snake Game
+this is the hosted link for easy access
+
 try : https://parthsidpara.github.io/scribbler-hackathon-project/
 
 ## Features
