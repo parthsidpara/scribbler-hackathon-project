@@ -7,7 +7,8 @@ Rishabh - 23BCE1258
 
 Varun - 23BCE1307
 
-### Project details:
+### Project: Voice Controlled Snake Game
+try : https://parthsidpara.github.io/scribbler-hackathon-project/
 
 ## Features
 - Voice Command Controls: Control the snake using voice commands like "up", "down", "left", and "right".
