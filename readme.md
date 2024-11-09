@@ -2,7 +2,9 @@ Team: bit coders
 
 ### Members: 
 Parth - 23BCE1228
+
 Rishabh - 23BCE1258
+
 Varun - 23BCE1307
 
 ### Project details:
