@@ -1,0 +1,406 @@
+// testing hand gestures:
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Mania - Swipe Control</title>
+    <!-- Load TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+    <!-- Load MediaPipe HandPose -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose"></script>
+    <style>
+        body {
+            height: 100%;
+            margin: 0;
+            font-family: 'Arial', sans-serif;
+            background: #282c34;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 18px;
+            flex-direction: row;
+            gap: 30px;
+        }
+
+        .game-container {
+            display: flex;
+            height: 100vh;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            position: relative;
+        }
+
+        .score-board {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #4CAF50;
+        }
+
+        canvas {
+            border: 3px solid #4CAF50;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+        }
+
+        .controls {
+            color: white;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        #startGesture {
+            padding: 12px 30px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        #startGesture:hover {
+            background-color: #45a049;
+        }
+
+        #gestureStatus {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            text-align: center;
+            font-size: 18px;
+            width: 250px;
+            transition: all 0.3s ease;
+        }
+
+        .webcam-container {
+            position: relative;
+            margin-top: 20px;
+        }
+
+        #webcam {
+            width: 320px;
+            height: 240px;
+            border-radius: 8px;
+            transform: scaleX(-1);
+        }
+
+        #gesture-canvas {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 320px;
+            height: 240px;
+            transform: scaleX(-1);
+        }
+
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.6);
+        }
+
+        .gesture-guide {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            text-align: left;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="game-container">
+        <h1>Snake Mania - Continuous Gesture Control!</h1>
+        <div class="score-board" id="score">Score: 0</div>
+        <canvas width="400" height="400" id="game"></canvas>
+        <div class="controls">
+            Use arrow keys or gesture control to direct the snake.
+        </div>
+        <button id="startGesture">Enable Gesture Controls</button>
+        <div id="gestureStatus">Gesture controls are off</div>
+        <div class="gesture-guide">
+            <h3>Gesture Guide:</h3>
+            <p>Move your index finger in the desired direction continuously.</p>
+            <p>Control the snake's movement in real-time by moving your finger left, right, up, or down.</p>
+        </div>
+    </div>
+
+    <div class="webcam-container">
+        <video id="webcam" playsinline></video>
+        <canvas id="gesture-canvas"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game');
+        const context = canvas.getContext('2d');
+        const grid = 16;
+        let count = 0;
+        let score = 0;
+        let gameRunning = true;
+        let gestureControlsActive = false;
+
+        let snake = {
+            x: 160,
+            y: 160,
+            dx: grid,
+            dy: 0,
+            cells: [],
+            maxCells: 4,
+            color: getRandomColor()
+        };
+
+        let apple = {
+            x: 320,
+            y: 320,
+            color: getRandomColor()
+        };
+
+        let model = null;
+        let video;
+        let gestureCanvas;
+        let gestureCtx;
+        let lastFingerPosition = null;
+        const movementThreshold = 20; // Minimum distance for changing direction
+
+        async function initializeGestureControls() {
+            const gestureStatus = document.getElementById('gestureStatus');
+            const startButton = document.getElementById('startGesture');
+
+            try {
+                gestureStatus.textContent = 'Loading handpose model...';
+                model = await handpose.load();
+
+                video = document.getElementById('webcam');
+                gestureCanvas = document.getElementById('gesture-canvas');
+                gestureCtx = gestureCanvas.getContext('2d');
+
+                video.width = gestureCanvas.width = 320;
+                video.height = gestureCanvas.height = 240;
+
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 320, height: 240 }
+                });
+                video.srcObject = stream;
+
+                await new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        video.play();
+                        resolve();
+                    };
+                });
+
+                gestureStatus.textContent = 'Gesture controls active!';
+                gestureStatus.style.backgroundColor = '#4CAF50';
+                startButton.style.display = 'none';
+
+                gestureControlsActive = true;
+                detectGestures();
+            } catch (error) {
+                console.error('Error initializing gesture controls:', error);
+                gestureStatus.textContent = 'Failed to initialize: ' + error.message;
+                gestureStatus.style.backgroundColor = '#ff4444';
+            }
+        }
+
+        async function detectGestures() {
+            if (!gestureControlsActive) return;
+
+            try {
+                const predictions = await model.estimateHands(video);
+                gestureCtx.clearRect(0, 0, gestureCanvas.width, gestureCanvas.height);
+
+                if (predictions.length > 0) {
+                    const hand = predictions[0];
+                    const indexFinger = hand.landmarks[8]; // Index fingertip
+
+                    gestureCtx.beginPath();
+                    gestureCtx.arc(indexFinger[0], indexFinger[1], 5, 0, 2 * Math.PI);
+                    gestureCtx.fillStyle = '#FF0000';
+                    gestureCtx.fill();
+
+                    if (lastFingerPosition) {
+                        trackFingerMovement(lastFingerPosition, { x: indexFinger[0], y: indexFinger[1] });
+                    }
+
+                    lastFingerPosition = { x: indexFinger[0], y: indexFinger[1] };
+                }
+            } catch (error) {
+                console.error('Error detecting gestures:', error);
+            }
+
+            requestAnimationFrame(detectGestures);
+        }
+
+        function trackFingerMovement(start, end) {
+            const dx = end.x - start.x;
+            const dy = end.y - start.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // Ensure the movement is significant enough to change direction
+            if (distance > movementThreshold) {
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    // Horizontal movement
+                    if (dx > 0 && snake.dx !== -grid) { // Only move right if the snake is not already moving left
+                        snake.dx = grid;
+                        snake.dy = 0; // Move right
+                    } else if (dx < 0 && snake.dx !== grid) { // Only move left if the snake is not already moving right
+                        snake.dx = -grid;
+                        snake.dy = 0; // Move left
+                    }
+                } else {
+                    // Vertical movement
+                    if (dy > 0 && snake.dy !== -grid) { // Only move down if the snake is not already moving up
+                        snake.dy = grid;
+                        snake.dx = 0; // Move down
+                    } else if (dy < 0 && snake.dy !== grid) { // Only move up if the snake is not already moving down
+                        snake.dy = -grid;
+                        snake.dx = 0; // Move up
+                    }
+                }
+            }
+        }
+
+
+        function getRandomInt(min, max) {
+            return Math.floor(Math.random() * (max - min)) + min;
+        }
+
+        function getRandomColor() {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
+
+        function updateScore() {
+            document.getElementById('score').textContent = 'Score: ' + score;
+        }
+
+        function resetGame() {
+            snake.x = 160;
+            snake.y = 160;
+            snake.cells = [];
+            snake.maxCells = 4;
+            snake.dx = grid;
+            snake.dy = 0;
+            snake.color = getRandomColor();
+            score = 0;
+            count = 0;
+            updateScore();
+
+            apple.x = getRandomInt(0, 25) * grid;
+            apple.y = getRandomInt(0, 25) * grid;
+            apple.color = getRandomColor();
+
+            gameRunning = true;
+        }
+
+        function loop() {
+            requestAnimationFrame(loop);
+            if (!gameRunning) return;
+
+            if (++count < 10) return;
+
+            count = 0;
+            context.clearRect(0, 0, canvas.width, canvas.height);
+
+            snake.x += snake.dx;
+            snake.y += snake.dy;
+
+            if (snake.x < 0) snake.x = canvas.width - grid;
+            else if (snake.x >= canvas.width) snake.x = 0;
+            if (snake.y < 0) snake.y = canvas.height - grid;
+            else if (snake.y >= canvas.height) snake.y = 0;
+
+            snake.cells.unshift({ x: snake.x, y: snake.y });
+            if (snake.cells.length > snake.maxCells) snake.cells.pop();
+
+            context.fillStyle = apple.color;
+            context.beginPath();
+            context.arc(apple.x + grid / 2, apple.y + grid / 2, grid / 2 - 1, 0, Math.PI * 2);
+            context.fill();
+
+            context.fillStyle = snake.color;
+            snake.cells.forEach(function (cell, index) {
+                context.fillRect(cell.x, cell.y, grid - 1, grid - 1);
+                if (cell.x === apple.x && cell.y === apple.y) {
+                    snake.maxCells++;
+                    score += 10;
+                    updateScore();
+
+                    do {
+                        apple.x = getRandomInt(0, 25) * grid;
+                        apple.y = getRandomInt(0, 25) * grid;
+                    } while (snake.cells.some(segment => segment.x === apple.x && segment.y === apple.y));
+
+                    apple.color = getRandomColor();
+                    snake.color = getRandomColor();
+                }
+
+                for (let i = index + 1; i < snake.cells.length; i++) {
+                    if (cell.x === snake.cells[i].x && cell.y === snake.cells[i].y) {
+                        gameRunning = false;
+                        const gameOverDiv = document.createElement('div');
+                        gameOverDiv.className = 'game-over';
+                        gameOverDiv.innerHTML = `Game Over! <br> Score: ${score} <br><button onclick="restartGame()">Restart</button>`;
+                        document.body.appendChild(gameOverDiv);
+                    }
+                }
+            });
+        }
+
+        function restartGame() {
+            const gameOverDiv = document.querySelector('.game-over');
+            if (gameOverDiv) gameOverDiv.remove();
+            resetGame();
+        }
+
+        document.getElementById('startGesture').addEventListener('click', initializeGestureControls);
+
+        document.addEventListener('keydown', function (e) {
+            if (!gameRunning) return;
+
+            if (e.key === 'ArrowLeft' && snake.dx === 0) {
+                snake.dx = -grid;
+                snake.dy = 0;
+            } else if (e.key === 'ArrowUp' && snake.dy === 0) {
+                snake.dy = -grid;
+                snake.dx = 0;
+            } else if (e.key === 'ArrowRight' && snake.dx === 0) {
+                snake.dx = grid;
+                snake.dy = 0;
+            } else if (e.key === 'ArrowDown' && snake.dy === 0) {
+                snake.dy = grid;
+                snake.dx = 0;
+            }
+        });
+
+        resetGame();
+        requestAnimationFrame(loop);
+    </script>
+</body>
+
+</html>
