@@ -15,7 +15,10 @@ The **Voice Controlled Snake Game** is an innovative twist on the classic Snake 
 **Try it out:**  
 You can play the game directly from the following link:  
 [Voice Controlled Snake Game](https://parthsidpara.github.io/scribbler-hackathon-project/)
-(JSNB will be added soon)
+(Note: Hosted version has not gesture control, to use gesture control, download the JSNB file and upload it in the scribbler pad)
+
+[JSNB added here](https://github.com/parthsidpara/scribbler-hackathon-project/blob/main/final_submission_notepad.jsnb)
+(Add 'I trust' in the JSNB notebook to use the gesture control)
 
 ---
 
@@ -27,7 +30,7 @@ You can play the game directly from the following link:
 - **Scoring System**:  
   Earn points by collecting randomly appearing foods on the game canvas. Your score increases as you consume more food.
 
-- **Game Over Screen**:  
+- **Game Over Screen**: (Implemented ✅) 
   When the snake collides with itself, a "Game Over" screen displays your final score, with an option to restart the game.
 
 - **Randomized Colors**:  
@@ -48,7 +51,7 @@ You can play the game directly from the following link:
 
 ### Planned Features (Coming Soon)
 
-- **Hand Gesture Controls**:  
+- **Hand Gesture Controls**:  (Implemented ✅)
   Implement hand gesture recognition to control the snake's movement without using voice or keyboard.
 
 - **Eye-Tracking Controls**:  
